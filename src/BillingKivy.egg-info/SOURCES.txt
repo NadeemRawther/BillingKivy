@@ -1,0 +1,10 @@
+LICENSE.txt
+MANIFEST.in
+README.md
+setup.cfg
+setup.py
+src/BillingKivy.egg-info/PKG-INFO
+src/BillingKivy.egg-info/SOURCES.txt
+src/BillingKivy.egg-info/dependency_links.txt
+src/BillingKivy.egg-info/requires.txt
+src/BillingKivy.egg-info/top_level.txt
