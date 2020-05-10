@@ -1,7 +1,6 @@
 from kivy.app import App
 from kivy.uix.textinput import TextInput
 from kivy.lang import Builder
-
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.properties import NumericProperty, ListProperty, BooleanProperty, ObjectProperty
@@ -12,7 +11,6 @@ from kivy.uix.label import Label
 from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivy.uix.behaviors import FocusBehavior
 from kivy.uix.recycleview.layout import LayoutSelectionBehavior
-
 Builder.load_string('''
 <Body>:
     canvas:
@@ -21,8 +19,6 @@ Builder.load_string('''
         Rectangle:
             pos: self.pos
             size: self.size
-
-
 <DropDownWidget>:
     canvas:
         Color:
@@ -64,19 +60,22 @@ Builder.load_string('''
         Line:
             rectangle: self.x +1 , self.y, self.width - 2, self.height -2
 
-    bar_width: 10
-    scroll_type:['bars']
+    bar_width: 5
+    bar_color: 1, 0, 0, 1   # red
+    bar_inactive_color: 0, 0, 1, 1   # blue
+    effect_cls: "ScrollEffect"
+    scroll_type: ['bars', 'content']
+
     viewclass: 'SelectableLabel'
     SelectableRecycleBoxLayout:
-        default_size: None, dp(20)
+        default_size: dp(50), dp(30)
         default_size_hint: 1, None
         size_hint_y: None
         height: self.minimum_height
         orientation: 'vertical'
         multiselect: False
+        touch_multiselect: True
         ''')
-
-
 class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
                                  RecycleBoxLayout):
     ''' Adds selection and focus behaviour to the view. '''

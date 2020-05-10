@@ -15,10 +15,7 @@ from kivy.uix.textinput import TextInput
 import sqlite3
 from kivy.uix.button import Button
 from collections import OrderedDict
-
-Builder.load_file('Operatorwindow/operator.kv')
-
-
+Builder.load_file('listcreation.kv')
 class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
                                  RecycleBoxLayout):
     ''' Adds selection and focus behaviour to the view. '''
@@ -39,6 +36,7 @@ class SelectableLabel(RecycleDataViewBehavior, Label):
     def on_touch_down(self, touch):
         ''' Add selection on touch down '''
         if super(SelectableLabel, self).on_touch_down(touch):
+
             return True
         if self.collide_point(*touch.pos) and self.selectable:
             return self.parent.select_with_touch(self.index, touch)
@@ -47,20 +45,21 @@ class SelectableLabel(RecycleDataViewBehavior, Label):
         ''' Respond to the selection of items in the view. '''
         self.selected = is_selected
 
+class ListcreationWindow(BoxLayout):
 
-class OperatorWindow(BoxLayout):
     code_inp = ObjectProperty()
     flt_list = ObjectProperty()
     word_list = ListProperty()
-
     def __init__(self, **kwargs):
-        super(OperatorWindow, self).__init__(**kwargs)
+        super(ListcreationWindow, self).__init__(**kwargs)
         self.cart = []
         self.qty = []
         self.total = 0.00
 
+
     # this is the variable storing the number to which the look-up will start
     starting_no = NumericProperty(3)
+
     def update_purchases(self):
         pcode = self.ids.code_inp.text
         pqty = self.ids.qty_inp.text
@@ -70,7 +69,7 @@ class OperatorWindow(BoxLayout):
         conn = sqlite3.connect('jdbc:sqlite:sqlite.db')
         c = conn.cursor()
         takser = '''SELECT * FROM products WHERE productcode = ?'''
-        if c.execute(takser, (pcode,)) is not None:
+        if c.execute(takser,(pcode,)) is not None:
             rows = c.fetchall()
             _stocks = OrderedDict()
             _stocks['product code'] = {}
@@ -99,11 +98,10 @@ class OperatorWindow(BoxLayout):
             self.ids.price_inp.text = _stocks['price'][0]
             details = BoxLayout(size_hint_y=None, height=30, pos_hint={'top': 1})
             products_container.add_widget(details)
-            code = Label(text=_stocks['product code'][0], size_hint_x=.2, color=(.06, .45, .45, 1))
+            code = Label(text= _stocks['product code'][0], size_hint_x=.2, color=(.06, .45, .45, 1))
             name = Label(text=_stocks['product name'][0], size_hint_x=.3, color=(.06, .45, .45, 1))
             qty = Label(text=_stocks['price'][0], size_hint_x=.1, color=(.06, .45, .45, 1))
-            price = Label(text=str(float(_stocks['price'][0]) * float(_stocks['price'][0])), size_hint_x=.1,
-                          color=(.06, .45, .45, 1))
+            price = Label(text=str(float(_stocks['price'][0]) * float(_stocks['price'][0])), size_hint_x=.1,color=(.06, .45, .45, 1))
             details.add_widget(code)
             details.add_widget(name)
             details.add_widget(qty)
@@ -128,7 +126,7 @@ class OperatorWindow(BoxLayout):
             if ptarget >= 0:
                 pqty = self.qty[ptarget] + 1
                 self.qty[ptarget] = pqty
-                expr = '%s\t\tx\d\t' % (pname)
+                expr = '%s\t\tx\d\t' %(pname)
                 rexpr = pname + '\t\tx' + str(pqty) + '\t'
                 nu_text = re.sub(expr, rexpr, prev_text)
                 preview.text = nu_text + purchase_total
@@ -136,23 +134,17 @@ class OperatorWindow(BoxLayout):
                 self.cart.append(pcode)
                 self.qty.append(1)
                 pqty = 1
-                nu_preview = '\n'.join(
-                    [prev_text, pname + '\t\tx' + str(pqty) + '\t\t' + str(pprice), str(purchase_total)])
+                nu_preview = '\n'.join([prev_text,pname+'\t\tx'+ str(pqty) +'\t\t'+str(pprice),str(purchase_total)])
                 preview.text = nu_preview
             _stocks.clear()
     def dopdown(self):
         pass
-
-
 class MyLayout(BoxLayout):
     code_inp = ObjectProperty()
     rv = ObjectProperty()
-
     def __init__(self, **kwargs):
         super(MyLayout, self).__init__(**kwargs)
 
-class CustomDropDown(DropDown):
-    pass
 class MyTextInput(TextInput):
     code_inp = ObjectProperty()
     flt_list = ObjectProperty()
@@ -161,39 +153,9 @@ class MyTextInput(TextInput):
     starting_no = NumericProperty(3)
     suggestion_text = ''
 
+
     def __init__(self, **kwargs):
         super(MyTextInput, self).__init__(**kwargs)
-        '''
-        customdrop = CustomDropDown()
-        dropdown = DropDown()
-        notes = ['Features', 'Suggestions', 'Abreviations', 'Miscellaneous']
-        for note in notes:
-            # when adding widgets, we need to specify the height manually (disabling
-            # the size_hint_y) so the dropdown can calculate the area it needs.
-            btn = Button(text='%r' % note, size_hint_y=None, height=30)
-
-            # for each button, attach a callback that will call the select() method
-            # on the dropdown. We'll pass the text of the button as the data of the
-            # selection.
-            btn.bind(on_release=lambda btn: dropdown.select(btn.text))
-
-            # then add the button inside the dropdown
-            dropdown.add_widget(btn)
-
-        # create a big main button
-
-
-        # show the dropdown menu when the main button is released
-        # note: all the bind() calls pass the instance of the caller (here, the
-        # mainbutton instance) as the first argument of the callback (here,
-        # dropdown.open.).
-        self.bind(on_text=dropdown.open)
-        # dd_btn.bind(on_release=dropdown.open)
-
-        # one last thing, listen for the selection in the dropdown list and
-        # assign the data to the button text.
-        dropdown.bind(on_select=lambda instance, x: setattr(mainbutton, 'text', x))
-    '''  
     def on_text(self, instance, value):
         # find all the occurrence of the word
         #self.parent.ids.rv.data = []
@@ -201,41 +163,35 @@ class MyTextInput(TextInput):
                    self.word_list[i][:self.starting_no] == value[:self.starting_no]]
         # display the data in the recycleview
         display_data = []
-
         for i in matches:
             display_data.append({'text': i})
         #self.parent.ids.rv.data = display_data
-        # ensure the size is okay
+        #ensure the size is okay
         if len(matches) <= 10:
-            pass
-            #self.parent.height = (50 + (len(matches) * 20))
+            self.parent.height = (50 + (len(matches) * 20))
         else:
             self.parent.height = 240
-
+        
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
         if self.suggestion_text and keycode[1] == 'tab':
             self.insert_text(self.suggestion_text + ' ')
             return True
         return super(MyTextInput, self).keyboard_on_key_down(window, keycode, text, modifiers)
 
-class RV(DropDown):
+class RV(RecycleView,DropDown):
     def __init__(self, **kwargs):
         super(RV, self).__init__(**kwargs)
-        notes = ['Features', 'Suggestions', 'Abreviations', 'Miscellaneous']
-        for note in notes:
-            btn = Button(text='%r' % note, size_hint_y=None, height=30)
-            btn.bind(on_release=lambda btn: self.select(btn.text))
-            self.add_widget(btn)
-        #self.data = [{'text': str(x)} for x in range(100)]
-        #self.data.insert(0, {'text': 'frank'})
-        #self.data.append({'text': 'man'})
-        mainbutton = MyTextInput()
-        mainbutton.bind(on_text=self.open)
-        self.bind(on_select=lambda instance, x: setattr(mainbutton, 'text', x))
+        self.data = [{'text': str(x)} for x in range(100)]
+        self.data.insert(0, {'text': 'frank'})
+        self.data.append({'text': 'man'})
 
-class OperatorApp(App):
+
+
+
+
+class ListcreationApp(App):
     def build(self):
         return ListcreationWindow()
 
-if __name__ == '__main__':
-    OperatorApp().run()
+if __name__=='__main__':
+    ListcreationApp().run()
