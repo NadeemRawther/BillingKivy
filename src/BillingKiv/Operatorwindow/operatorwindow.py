@@ -13,55 +13,61 @@ from kivy.uix.recycleview.layout import LayoutSelectionBehavior
 from kivy.properties import NumericProperty, ListProperty, BooleanProperty, ObjectProperty
 from kivy.uix.textinput import TextInput
 import sqlite3
+import re
 from kivy.uix.button import Button
+from kivy.core.window import Window
+from kivy.uix.widget import Widget
+from kivy.clock import Clock
 from collections import OrderedDict
+from kivy.uix.gridlayout import GridLayout
 
 Builder.load_file('Operatorwindow/operator.kv')
 
+class CustomDropDown(DropDown):
+    force_below = BooleanProperty(False)  # if True, DropDown will be positioned below attached to Widget
+    def __init__(self, **kwargs):
+        super(CustomDropDown, self).__init__(**kwargs)
+        self.do_not_reposition = False  # flag used to avoid repositioning recursion
 
-class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
-                                 RecycleBoxLayout):
-    ''' Adds selection and focus behaviour to the view. '''
+    def _reposition(self, *largs):
+        if self.do_not_reposition:
+            return
+        super(CustomDropDown, self)._reposition(*largs)
+        if self.force_below:
+            self.make_drop_below()
 
-
-class SelectableLabel(RecycleDataViewBehavior, Label):
-    ''' Add selection support to the Label '''
-    index = None
-    selected = BooleanProperty(False)
-    selectable = BooleanProperty(True)
-
-    def refresh_view_attrs(self, rv, index, data):
-        ''' Catch and handle the view changes '''
-        self.index = index
-        return super(SelectableLabel, self).refresh_view_attrs(
-            rv, index, data)
-
-    def on_touch_down(self, touch):
-        ''' Add selection on touch down '''
-        if super(SelectableLabel, self).on_touch_down(touch):
-            return True
-        if self.collide_point(*touch.pos) and self.selectable:
-            return self.parent.select_with_touch(self.index, touch)
-
-    def apply_selection(self, rv, index, is_selected):
-        ''' Respond to the selection of items in the view. '''
-        self.selected = is_selected
-
+    def make_drop_below(self):
+        self.do_not_reposition = True  # avoids recursion triggered by the changes below
+        if self.attach_to is not None:
+            wx, wy = self.to_window(*self.attach_to.pos)
+            self.height = wy  # height of DropDown will fill window below attached to Widget
+            self.top = wy  # top of DropDown will be at bottom of attached to Widget
+        self.do_not_reposition = False  # now turn auto repositioning back on
 
 class OperatorWindow(BoxLayout):
     code_inp = ObjectProperty()
     flt_list = ObjectProperty()
     word_list = ListProperty()
 
+
+
     def __init__(self, **kwargs):
         super(OperatorWindow, self).__init__(**kwargs)
         self.cart = []
         self.qty = []
+        self.idx = 0
         self.total = 0.00
+        self.pname = self.ids.disc_inp.text
+        self.rows = ListProperty()
+        self._stocks = OrderedDict()
+        self.pcode = self.ids.code_inp.text
+        self.product_code = []
+        self.product_name = []
+        self.product_weight = []
+        self.price = []
 
-    # this is the variable storing the number to which the look-up will start
-    starting_no = NumericProperty(3)
-    def update_purchases(self):
+
+    def update_price(self):
         pcode = self.ids.code_inp.text
         pqty = self.ids.qty_inp.text
         pname = self.ids.disc_inp.text
@@ -70,51 +76,24 @@ class OperatorWindow(BoxLayout):
         conn = sqlite3.connect('jdbc:sqlite:sqlite.db')
         c = conn.cursor()
         takser = '''SELECT * FROM products WHERE productcode = ?'''
+        input_list = []
         if c.execute(takser, (pcode,)) is not None:
-            rows = c.fetchall()
-            _stocks = OrderedDict()
-            _stocks['product code'] = {}
-            _stocks['product name'] = {}
-            _stocks['product weight'] = {}
-            _stocks['price'] = {}
-            product_code = []
-            product_name = []
-            product_weight = []
-            price = []
-            for j in rows:
-                product_code.append(j[1])
-                product_name.append(j[2])
-                product_weight.append(j[3])
-                price.append(j[4])
-            products_length = len(product_code)
-            idx = 0
-            while idx < products_length:
-                _stocks['product code'][idx] = product_code[idx]
-                _stocks['product name'][idx] = product_name[idx]
-                _stocks['product weight'][idx] = product_weight[idx]
-                _stocks['price'][idx] = price[idx]
-                idx += 1
-            self.ids.code_inp.text = _stocks['product code'][0]
-            self.ids.disc_inp.text = _stocks['product name'][0]
-            self.ids.price_inp.text = _stocks['price'][0]
-            details = BoxLayout(size_hint_y=None, height=30, pos_hint={'top': 1})
-            products_container.add_widget(details)
-            code = Label(text=_stocks['product code'][0], size_hint_x=.2, color=(.06, .45, .45, 1))
-            name = Label(text=_stocks['product name'][0], size_hint_x=.3, color=(.06, .45, .45, 1))
-            qty = Label(text=_stocks['price'][0], size_hint_x=.1, color=(.06, .45, .45, 1))
-            price = Label(text=str(float(_stocks['price'][0]) * float(_stocks['price'][0])), size_hint_x=.1,
-                          color=(.06, .45, .45, 1))
-            details.add_widget(code)
-            details.add_widget(name)
-            details.add_widget(qty)
-            details.add_widget(price)
-            self.total += float(_stocks['price'][0])
+            self.rows = c.fetchall()
+            for j in self.rows:
+                self.product_code.append(j[1])
+                self.product_name.append(j[2])
+                self.product_weight.append(pqty)
+                self.price.append(str(int(j[4])* int(pqty)))
+            products_length = len(self.product_code)
+
+            self.ids.price_inp.text=""
+            mlen = len(self.price)
+            self.ids.price_inp.text = str(self.price[mlen-1])
+
+
+            '''
+            self.total += float(self._stocks['price'][0])
             purchase_total = '`\n\nTotal\t\t\t\t\t\t\t\t' + str(self.total)
-            self.ids.cur_product.text = _stocks['product name'][0]
-            self.ids.cur_price.text = _stocks['price'][0]
-            pname = _stocks['product name'][0]
-            pprice = _stocks['price'][0]
-            pcode = _stocks['product code'][0]
             preview = self.ids.receipt_preview
             prev_text = preview.text
             pqty = str(1)
@@ -139,103 +118,271 @@ class OperatorWindow(BoxLayout):
                 nu_preview = '\n'.join(
                     [prev_text, pname + '\t\tx' + str(pqty) + '\t\t' + str(pprice), str(purchase_total)])
                 preview.text = nu_preview
-            _stocks.clear()
-    def dopdown(self):
-        pass
+            '''
+
+    def printer(self):
+        total = 0
+        pqty = self.ids.qty_inp.text
+        for ij in self.price:
+
+            total += float(ij)
+
+        purchase_total = '`\n\nTotal\t\t\t\t\t\t\t\t' + str(total)
+        preview = self.ids.receipt_preview
+        preview.text = ""
+        texter = "\t\t\t\tThe Collector\n\t\t\t\t123 Main St\n\t\t\t\tKnowhere, Space\n\n\t\t\t\tTel:(555)-123-456\n\t\t\t\tReceipt No:\n\t\t\t\t Gate:\n\n"
+        preview.text = texter
+        prev_text = preview.text
+        js = 0
+        for pcod in self.product_name:
+
+            preview.text = preview.text + ('\n'+ pcod + '\t\tx' + self.product_weight[js] + '\t\t' + self.price[js])
+            js += 1
+        preview.text = preview.text+str(purchase_total)
 
 
-class MyLayout(BoxLayout):
-    code_inp = ObjectProperty()
-    rv = ObjectProperty()
 
-    def __init__(self, **kwargs):
-        super(MyLayout, self).__init__(**kwargs)
-
-class CustomDropDown(DropDown):
-    pass
 class MyTextInput(TextInput):
     code_inp = ObjectProperty()
     flt_list = ObjectProperty()
     word_list = ListProperty()
-    # this is the variable storing the number to which the look-up will start
-    starting_no = NumericProperty(3)
-    suggestion_text = ''
-
+    starting_no = NumericProperty(1)
     def __init__(self, **kwargs):
         super(MyTextInput, self).__init__(**kwargs)
-        '''
-        customdrop = CustomDropDown()
-        dropdown = DropDown()
-        notes = ['Features', 'Suggestions', 'Abreviations', 'Miscellaneous']
-        for note in notes:
-            # when adding widgets, we need to specify the height manually (disabling
-            # the size_hint_y) so the dropdown can calculate the area it needs.
-            btn = Button(text='%r' % note, size_hint_y=None, height=30)
+        #Clock.schedule_once(self.on_text)
+        conn = sqlite3.connect('jdbc:sqlite:sqlite.db')
+        self.c = conn.cursor()
+        self.takser = '''SELECT * FROM products WHERE productcode LIKE ? '''
+        self.word_list = []
+        self.bind()
+        self.dropdown = CustomDropDown(force_below=True)
+        self.display_data = []
+    def mymethod(self,instance,x):
 
-            # for each button, attach a callback that will call the select() method
-            # on the dropdown. We'll pass the text of the button as the data of the
-            # selection.
-            btn.bind(on_release=lambda btn: dropdown.select(btn.text))
+        takser = '''SELECT * FROM products WHERE productcode = ? '''
+        input_list = []
+        if self.c.execute(takser,(x,)) is not None:
+            rows = self.c.fetchall()
+            _stocks = OrderedDict()
+            _stocks['product code'] = {}
+            _stocks['product name'] = {}
+            _stocks['product weight'] = {}
+            _stocks['price'] = {}
+            product_code = []
+            product_name = []
+            product_weight = []
+            price = []
+            for j in rows:
+                product_code.append(j[1])
+                product_name.append(j[2])
+                product_weight.append(j[3])
+                price.append(j[4])
+            products_length = len(product_code)
 
-            # then add the button inside the dropdown
-            dropdown.add_widget(btn)
+            for j in product_name:
+                App.get_running_app().root.operator_widget.ids.disc_inp.text=j
+                App.get_running_app().root.operator_widget.ids.code_inp.text = x
+                print(j)
 
-        # create a big main button
-
-
-        # show the dropdown menu when the main button is released
-        # note: all the bind() calls pass the instance of the caller (here, the
-        # mainbutton instance) as the first argument of the callback (here,
-        # dropdown.open.).
-        self.bind(on_text=dropdown.open)
-        # dd_btn.bind(on_release=dropdown.open)
-
-        # one last thing, listen for the selection in the dropdown list and
-        # assign the data to the button text.
-        dropdown.bind(on_select=lambda instance, x: setattr(mainbutton, 'text', x))
-    '''  
     def on_text(self, instance, value):
-        # find all the occurrence of the word
-        #self.parent.ids.rv.data = []
-        matches = [self.word_list[i] for i in range(len(self.word_list)) if
-                   self.word_list[i][:self.starting_no] == value[:self.starting_no]]
-        # display the data in the recycleview
-        display_data = []
+        self.dropdown.clear_widgets()
+        self.word_list.clear()
+        self.display_data.clear()
+        if self.c.execute(self.takser,(value+"%",)) is not None:
+            rows = self.c.fetchall()
+            _stocks = OrderedDict()
+            _stocks['product code'] = {}
+            _stocks['product name'] = {}
+            _stocks['product weight'] = {}
+            _stocks['price'] = {}
+            product_code = []
+            product_name = []
+            product_weight = []
+            price = []
+            for j in rows:
+                product_code.append(j[1])
+                product_name.append(j[2])
+                product_weight.append(j[3])
+                price.append(j[4])
+            products_length = len(product_code)
+            for j in product_code:
+                self.word_list.append(j)
+        for i in self.word_list:
+            self.display_data.append(i)
+        print(self.display_data)
+        for note in self.display_data:
+            btn = Button(text='%r' % int(note), size_hint_y=None, height=30)
+            btn.bind(on_release=lambda btn: self.dropdown.select(btn.text))
+            self.dropdown.add_widget(btn)
 
-        for i in matches:
-            display_data.append({'text': i})
-        #self.parent.ids.rv.data = display_data
-        # ensure the size is okay
-        if len(matches) <= 10:
-            pass
-            #self.parent.height = (50 + (len(matches) * 20))
-        else:
-            self.parent.height = 240
+        self.dropdown.bind(on_select= self.mymethod)#lambda instance, x: setattr(self, 'text', x))
+
+        if self.dropdown.parent is None and self.get_parent_window() is not None:
+            self.dropdown.open(self)
+            self.dropdown.clear_widgets()
+            self.word_list.clear()
+            self.display_data.clear()
+
 
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
         if self.suggestion_text and keycode[1] == 'tab':
             self.insert_text(self.suggestion_text + ' ')
             return True
         return super(MyTextInput, self).keyboard_on_key_down(window, keycode, text, modifiers)
+class MyTextInput2(TextInput):
+    code_inp = ObjectProperty()
+    flt_list = ObjectProperty()
+    word_list = ListProperty()
+    # this is the variable storing the number to which the look-up will start
+    starting_no = NumericProperty(1)
+    suggestion_text = ''
 
-class RV(DropDown):
+
+    def __init__(self, **kwargs):
+        super(MyTextInput2, self).__init__(**kwargs)
+        self.word_list = []
+        # display the data in the recycleview
+        self.dropdown = CustomDropDown(force_below=True)
+        conn = sqlite3.connect('jdbc:sqlite:sqlite.db')
+        self.c = conn.cursor()
+        self.takser = '''SELECT * FROM products WHERE productname LIKE ? '''
+        self.word_list = []
+
+        # display the data in the recycleview
+        self.dropdown = CustomDropDown(force_below=True)
+        self.display_data = []
+
+    def mymethod2(self,instance,x):
+
+        takser = '''SELECT * FROM products WHERE productname = ? '''
+        input_list = []
+        if self.c.execute(takser,(x,)) is not None:
+            rows = self.c.fetchall()
+            _stocks = OrderedDict()
+            _stocks['product code'] = {}
+            _stocks['product name'] = {}
+            _stocks['product weight'] = {}
+            _stocks['price'] = {}
+            product_code = []
+            product_name = []
+            product_weight = []
+            price = []
+            for j in rows:
+                product_code.append(j[1])
+                product_name.append(j[2])
+                product_weight.append(j[3])
+                price.append(j[4])
+            products_length = len(product_code)
+
+            for j in product_code:
+                App.get_running_app().root.operator_widget.ids.code_inp.text=j
+                App.get_running_app().root.operator_widget.ids.disc_inp.text = x
+                print(j)
+
+    def on_text(self, instance, value):
+        self.dropdown.clear_widgets()
+        self.word_list.clear()
+
+        self.display_data.clear()
+        if self.c.execute(self.takser, (value + "%",)) is not None:
+            rows = self.c.fetchall()
+            _stocks = OrderedDict()
+            _stocks['product code'] = {}
+            _stocks['product name'] = {}
+            _stocks['product weight'] = {}
+            _stocks['price'] = {}
+            product_code = []
+            product_name = []
+            product_weight = []
+            price = []
+            for j in rows:
+                product_code.append(j[1])
+                product_name.append(j[2])
+                product_weight.append(j[3])
+                price.append(j[4])
+            products_length = len(product_code)
+            for j in product_name:
+                print(j)
+                self.word_list.append(j)
+        for i in self.word_list:
+            self.display_data.append(i.strip("'"))
+        print(self.display_data)
+        for note in self.display_data:
+            btn = Button(text=note.strip("'"), size_hint_y=None, height=30)
+            btn.bind(on_release=lambda btn: self.dropdown.select(btn.text))
+            self.dropdown.add_widget(btn)
+        self.dropdown.bind(on_select= self.mymethod2) #lambda instance, x: setattr(self, 'text', x))
+        if self.dropdown.parent is None and self.get_parent_window() is not None:
+            self.dropdown.open(self)
+            self.dropdown.clear_widgets()
+            self.word_list.clear()
+            self.display_data.clear()
+    def keyboard_on_key_down(self, window, keycode, text, modifiers):
+        print('The key', keycode, 'have been pressed')
+
+        if self.suggestion_text and keycode[1] == 'tab':
+            self.insert_text(self.suggestion_text + ' ')
+            return True
+        return super(MyTextInput2, self).keyboard_on_key_down(window, keycode, text, modifiers)
+
+
+class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
+                                 RecycleBoxLayout):
+    ''' Adds selection and focus behaviour to the view. '''
+
+class SelectableLabel(RecycleDataViewBehavior, GridLayout):
+    ''' Add selection support to the Label '''
+    index = None
+    selected = BooleanProperty(False)
+    selectable = BooleanProperty(True)
+    cols = 5
+
+
+    def refresh_view_attrs(self, rv, index, data):
+        ''' Catch and handle the view changes '''
+        self.index = index
+        self.label1_text = data['label1']['text']
+        self.label2_text = data['label2']['text']
+        self.label4_text = data['label4']['text']
+        self.label3_text = data['label3']['text']
+
+        #self.ids['id_label3'].text = data['label3']['text']  # As an alternate method of assignment
+        return super(SelectableLabel, self).refresh_view_attrs(
+            rv, index, data)
+    def callme(self,index):
+        print(index)
+        App.get_running_app().root.operator_widget.ids.rv.data.pop(index)
+        App.get_running_app().root.operator_widget.product_code.pop(index)
+        App.get_running_app().root.operator_widget.product_name.pop(index)
+        App.get_running_app().root.operator_widget.product_weight.pop(index)
+        App.get_running_app().root.operator_widget.price.pop(index)
+        for m in App.get_running_app().root.operator_widget.price:
+            print(m+"nadeem got")
+
+
+    def on_touch_down(self, touch):
+        ''' Add selection on touch down '''
+        if super(SelectableLabel, self).on_touch_down(touch):
+            return True
+        if self.collide_point(*touch.pos) and self.selectable:
+            return self.parent.select_with_touch(self.index, touch)
+
+    def apply_selection(self, rv, index, is_selected):
+        ''' Respond to the selection of items in the view. '''
+        self.selected = is_selected
+        if is_selected:
+            print("selection changed to {0}".format(rv.data[index]))
+        else:
+            print("selection removed for {0}".format(rv.data[index]))
+
+class RV(RecycleView):
     def __init__(self, **kwargs):
         super(RV, self).__init__(**kwargs)
-        notes = ['Features', 'Suggestions', 'Abreviations', 'Miscellaneous']
-        for note in notes:
-            btn = Button(text='%r' % note, size_hint_y=None, height=30)
-            btn.bind(on_release=lambda btn: self.select(btn.text))
-            self.add_widget(btn)
-        #self.data = [{'text': str(x)} for x in range(100)]
-        #self.data.insert(0, {'text': 'frank'})
-        #self.data.append({'text': 'man'})
-        mainbutton = MyTextInput()
-        mainbutton.bind(on_text=self.open)
-        self.bind(on_select=lambda instance, x: setattr(mainbutton, 'text', x))
+        self.data = []
 
 class OperatorApp(App):
     def build(self):
-        return ListcreationWindow()
+        return OperatorWindow()
 
 if __name__ == '__main__':
     OperatorApp().run()
