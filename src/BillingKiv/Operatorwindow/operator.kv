@@ -1,23 +1,45 @@
 <SelectableLabel>:
     # Draw a background to indicate selection
-    color: 0,0,0,1
+
     canvas.before:
         Color:
-            rgba: (0, 0, 1, 5) if self.selected else (1, 1, 1, 1)
+            rgba: (.0, 0.9, .1, .3) if self.selected else (0, 0, 0, 1)
         Rectangle:
             pos: self.pos
             size: self.size
-<MyTextInput>:
-    readonly: False
-    multiline: False
-<RV>:
+    label1_text: 'label 1 text'
+    label2_text: 'label 2 text'
+    label3_text: 'label 3 text'
+    label4_text: 'label 4 text'
+    pos: self.pos
+    size: self.size
+    Label:
+        id: id_label1
+        text: root.label1_text
+        size_hint_x:.2
+    Label:
+        id: id_label2
+        text: root.label2_text
+        size_hint_x:.3
+    Label:
+        id: id_label3
+        text: root.label3_text
+        size_hint_x:.1
+    Label:
+        id: id_label4
+        text: root.label4_text
+        size_hint_x:.1
+    Button:
+        id:id_label5
+        text:"-"
+        size_hint_x:.01
+        on_press:root.callme(root.index)
 
-    bar_width: 1
-    bar_color: 1, 0, 0, 1   # red
-    bar_inactive_color: 0, 0, 1, 1   # blue
+
+<RV>:
     viewclass: 'SelectableLabel'
     SelectableRecycleBoxLayout:
-        default_size: dp(50), dp(30)
+        default_size: None, dp(56)
         default_size_hint: 1, None
         size_hint_y: None
         height: self.minimum_height
@@ -25,7 +47,12 @@
         multiselect: False
         touch_multiselect: True
 
-
+<MyTextInput>:
+    readonly: False
+    multiline: False
+<MyTextInput2>:
+    readonly: False
+    multiline: False
 <FlatButton@ButtonBehavior+Label>:
     font_size: 14
 <OperatorWindow>:
@@ -115,31 +142,28 @@
                     size_hint_x: .1
             BoxLayout:
                 id:product_inputs
-                size_hint_y:None
+                size_hint_y:.1
                 height: 30
                 spacing:5
                 TextInput:
                     id:qty_inp
                     size_hint_x:.1
-                MyLayout:
-                    orientation: 'vertical'
-                    spacing: 2
-                    code_inp: code_inp
-                    MyTextInput:
-                        id: code_inp
-                        size_hint_x:1
-                        multiline:False
-                        size_hint_y:1
-                        on_text_validate:root.update_purchases()
-                    RV:
-                        id:rv
-                        size_hint_x:1
-                TextInput:
+                    multiline:False
+                    on_text_validate:root.update_price()
+
+                MyTextInput:
+                    id: code_inp
+                    size_hint_x:.3
+                    multiline:False
+                MyTextInput2:
                     id:disc_inp
                     size_hint_x:.2
                 TextInput:
                     id:price_inp
                     size_hint_x:.1
+                    on_text:
+                        if price_inp.text == "":pass
+                        else: rv.data.append({'label1': {'text':code_inp.text }, 'label2': {'text':disc_inp.text }, 'label3': {'text':qty_inp.text },'label4': {'text': price_inp.text}})
             BoxLayout:
                 id:add_to_cart
                 orientation:"vertical"
@@ -164,9 +188,11 @@
                     Label:
                         text:'Price'
                         size_hint_x:.1
-                GridLayout:
+                BoxLayout:
                     id: products
                     cols: 1
+                    RV:
+                        id:rv
         BoxLayout:
             id:preview
             orientation:'vertical'
@@ -181,6 +207,7 @@
                 id:button_pro
                 text:'Process'
                 size:75,40
+                on_press:root.printer()
                 size_hint: None,None
     BoxLayout:
         id:footer

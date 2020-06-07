@@ -12,6 +12,8 @@ class MainWindow(BoxLayout):
     admin_widget = AdminWindow()
     signin_widget = PongGame()
     operator_widget = OperatorWindow()
+    def changecode(self):
+        print("kittiyeda")
 
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
